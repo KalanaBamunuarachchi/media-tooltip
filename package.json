@@ -1,0 +1,47 @@
+{
+    "name": "media-tooltip",
+    "version": "1.0.0",
+    "description": "Lightweight media-powered tooltips for web applications",
+    "keywords": [
+        "tooltip",
+        "media",
+        "video",
+        "onboarding",
+        "ui",
+        "ux",
+        "typescript",
+        "javascript",
+        "frontend"
+    ],
+    "scripts": {
+        "build": "tsup",
+        "dev": "tsup --watch",
+        "prepare": "npm run build"
+    },
+    "homepage": "https://github.com/KalanaBamunuarachchi/media-tooltip",
+    "bugs": {
+        "url": "https://github.com/KalanaBamunuarachchi/media-tooltip/issues"
+    },
+    "author": "Kalana Bamunuarachchi (https://kalana.me)",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/KalanaBamunuarachchi/media-tooltip.git"
+    },
+    "files": [
+        "dist"
+    ],
+    "type": "module",
+    "main": "./dist/index.cjs",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js",
+            "require": "./dist/index.cjs"
+        }
+    },
+    "devDependencies": {
+        "tsup": "^8.5.1",
+        "typescript": "5.7.3"
+    }
+}

@@ -36,35 +36,129 @@ export function tooltip(
     video.style.display = "block";
     video.style.width = `${options.width ?? 300}px`;
     video.style.height = "auto";
+    video.style.maxWidth = "calc(100vw - 16px)";
+    video.style.maxHeight = "calc(100vh - 16px)";
+    video.style.objectFit = "contain";
 
     document.body.appendChild(container);
 
     //postioning helper func
+
     const positionTooltip = () => {
         const rect = element.getBoundingClientRect();
+        console.log({
+            target: {
+                top: rect.top,
+                bottom: rect.bottom,
+                left: rect.left,
+                right: rect.right,
+                width: rect.width,
+                height: rect.height,
+            },
+            viewport: {
+                width: window.innerWidth,
+                height: window.innerHeight,
+            },
+        });
         const offset = options.offset ?? 8;
-        const position = options.position ?? "top";
+        const margin = 8;
 
-        if (position === "top") {
-            container.style.top = `${rect.top - container.offsetHeight - offset}px`;
-            container.style.left = `${rect.left + (rect.width - container.offsetWidth) / 2}px`;
-        } else if (position === "bottom") {
-            container.style.top = `${rect.bottom + offset}px`;
-            container.style.left = `${rect.left + (rect.width - container.offsetWidth) / 2}px`;
-        } else if (position === "left") {
-            container.style.top = `${rect.top + (rect.height - container.offsetHeight) / 2}px`;
-            container.style.left = `${rect.left - container.offsetWidth - offset}px`;
-        } else {
-            container.style.top = `${rect.top + (rect.height - container.offsetHeight) / 2}px`;
-            container.style.left = `${rect.right + offset}px`;
-        }
+        const width = container.offsetWidth;
+        const height = container.offsetHeight;
+
+        const preferred = options.position ?? "top";
+
+        const opposite = {
+            top: "bottom",
+            bottom: "top",
+            left: "right",
+            right: "left",
+        } as const;
+
+        const getCoordinates = (
+            position: NonNullable<TooltipOptions["position"]>
+        ) => {
+            let top: number;
+            let left: number;
+
+            switch (position) {
+                case "top":
+                    top = rect.top - height - offset;
+                    left = rect.left + (rect.width - width) / 2;
+                    break;
+
+                case "bottom":
+                    top = rect.bottom + offset;
+                    left = rect.left + (rect.width - width) / 2;
+                    break;
+
+                case "left":
+                    top = rect.top + (rect.height - height) / 2;
+                    left = rect.left - width - offset;
+                    break;
+
+                case "right":
+                    top = rect.top + (rect.height - height) / 2;
+                    left = rect.right + offset;
+                    break;
+            }
+
+            const fits = {
+                top: rect.top - height - offset >= margin,
+                bottom: rect.bottom + height + offset <=
+                    window.innerHeight - margin,
+                left: rect.left - width - offset >= margin,
+                right: rect.right + width + offset <=
+                    window.innerWidth - margin,
+            }[position];
+
+            return { top, left, fits };
+        };
+
+        const order = [
+            preferred,
+            opposite[preferred],
+            ...(["top", "bottom", "left", "right"] as const).filter(
+                (side) =>
+                    side !== preferred && side !== opposite[preferred]
+            ),
+        ];
+
+        const selected =
+            order.map(getCoordinates).find((result) => result.fits) ??
+            getCoordinates(preferred);
+
+        const maxLeft = Math.max(
+            margin,
+            window.innerWidth - width - margin
+        );
+
+        const maxTop = Math.max(
+            margin,
+            window.innerHeight - height - margin
+        );
+
+        container.style.left =
+            `${Math.min(maxLeft, Math.max(margin, selected.left))}px`;
+
+        container.style.top =
+            `${Math.min(maxTop, Math.max(margin, selected.top))}px`;
     };
+    video.addEventListener("loadedmetadata", positionTooltip);
+
 
     function show(): void {
         if (destroyed) return;
 
         container.style.display = "block";
         positionTooltip();
+        console.log({
+            containerPosition: container.style.position,
+            top: container.style.top,
+            left: container.style.left,
+            width: container.offsetWidth,
+            height: container.offsetHeight,
+        });
     }
 
     function hide(): void {
@@ -92,6 +186,7 @@ export function tooltip(
         video.load();
 
         container.remove();
+        video.removeEventListener("loadedmetadata", positionTooltip);
     }
     //timeout for tooltip
 

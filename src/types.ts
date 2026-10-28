@@ -21,3 +21,8 @@ export type TooltipInstance = {
     destroy(): void;
 }
 
+export type MediaTooltipsOptions = {
+    selector?: string;
+    defaults?: Omit<TooltipOptions, "media">;
+};
+

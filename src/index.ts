@@ -46,20 +46,7 @@ export function tooltip(
 
     const positionTooltip = () => {
         const rect = element.getBoundingClientRect();
-        console.log({
-            target: {
-                top: rect.top,
-                bottom: rect.bottom,
-                left: rect.left,
-                right: rect.right,
-                width: rect.width,
-                height: rect.height,
-            },
-            viewport: {
-                width: window.innerWidth,
-                height: window.innerHeight,
-            },
-        });
+
         const offset = options.offset ?? 8;
         const margin = 8;
 
@@ -144,26 +131,43 @@ export function tooltip(
         container.style.top =
             `${Math.min(maxTop, Math.max(margin, selected.top))}px`;
     };
-    video.addEventListener("loadedmetadata", positionTooltip);
+    function handleVideoMetadata(): void {
+        if (destroyed) return;
+
+        if (container.style.display !== "none") {
+            positionTooltip();
+        }
+    }
+
+    function handleViewportChange(): void {
+        if (destroyed || container.style.display === "none") {
+            return;
+        }
+
+        positionTooltip();
+    }
+
+
+    video.addEventListener("loadedmetadata", handleVideoMetadata);
+
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+
 
 
     function show(): void {
         if (destroyed) return;
 
+        cancelHide();
+
         container.style.display = "block";
         positionTooltip();
-        console.log({
-            containerPosition: container.style.position,
-            top: container.style.top,
-            left: container.style.left,
-            width: container.offsetWidth,
-            height: container.offsetHeight,
-        });
     }
 
     function hide(): void {
         if (destroyed) return;
 
+        cancelHide();
         container.style.display = "none";
     }
 
@@ -186,7 +190,10 @@ export function tooltip(
         video.load();
 
         container.remove();
-        video.removeEventListener("loadedmetadata", positionTooltip);
+        video.removeEventListener("loadedmetadata", handleVideoMetadata);
+
+        window.removeEventListener("resize", handleViewportChange);
+        window.removeEventListener("scroll", handleViewportChange, true);
     }
     //timeout for tooltip
 
@@ -233,4 +240,61 @@ export function tooltip(
 
 
 
+}
+
+
+export function createMediaTooltips() {
+    const elements = document.querySelectorAll<HTMLElement>(
+        "[data-tooltip-media]"
+    );
+
+
+    const instances = Array.from(elements).map((element) => {
+        const media = element.dataset.tooltipMedia;
+
+        if (!media) return null;
+
+        const rawPosition = element.dataset.tooltipPosition;
+        const rawWidth = element.dataset.tooltipWidth;
+        const parsedWidth = rawWidth === undefined ? undefined : Number(rawWidth);
+        const rawOffset = element.dataset.tooltipOffset;
+        const parsedOffset = rawOffset === undefined ? undefined : Number(rawOffset);
+
+        //position
+        const position =
+            rawPosition === "top" ||
+                rawPosition === "bottom" ||
+                rawPosition === "left" ||
+                rawPosition === "right"
+                ? rawPosition
+                : undefined;
+
+        //width
+        const width =
+            parsedWidth !== undefined &&
+                Number.isFinite(parsedWidth) &&
+                parsedWidth > 0
+                ? parsedWidth
+                : undefined;
+
+        const offset =
+            parsedOffset !== undefined &&
+                Number.isFinite(parsedOffset) &&
+                parsedOffset >= 0
+                ? parsedOffset
+                : undefined;
+
+        return tooltip(element, {
+            media,
+            position,
+            width,
+            offset,
+        });
+    });
+
+    return {
+        destroy() {
+            instances.forEach((instance) => instance?.destroy());
+        }
+    };
 }

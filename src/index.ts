@@ -184,6 +184,10 @@ export function tooltip(
             container.removeEventListener("mouseenter", cancelHide);
             container.removeEventListener("mouseleave", handleMouseLeave);
         }
+        if (options.trigger === "click") {
+            element.removeEventListener("click", handleClick);
+            document.removeEventListener("click", handleDocumentClick);
+        }
 
         video.pause();
         video.removeAttribute("src");
@@ -223,6 +227,29 @@ export function tooltip(
         scheduleHide();
     }
 
+    function handleClick(): void {
+        if (destroyed) return;
+
+        if (container.style.display === "none") {
+            show();
+        } else {
+            hide();
+        }
+    }
+
+    function handleDocumentClick(event: MouseEvent): void {
+        const target = event.target;
+
+        if (
+            target instanceof Node &&
+            (element.contains(target) || container.contains(target))
+        ) {
+            return;
+        }
+
+        hide();
+    }
+
     if ((options.trigger ?? "hover") === "hover") {
         element.addEventListener("mouseenter", handleMouseEnter);
         element.addEventListener("mouseleave", handleMouseLeave);
@@ -230,6 +257,12 @@ export function tooltip(
         container.addEventListener("mouseenter", cancelHide);
         container.addEventListener("mouseleave", handleMouseLeave);
     }
+
+    if (options.trigger === "click") {
+        element.addEventListener("click", handleClick);
+        document.addEventListener("click", handleDocumentClick);
+    }
+
 
     return {
         show,

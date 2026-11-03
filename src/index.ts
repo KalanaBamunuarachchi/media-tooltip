@@ -292,6 +292,7 @@ export function createMediaTooltips() {
         const parsedWidth = rawWidth === undefined ? undefined : Number(rawWidth);
         const rawOffset = element.dataset.tooltipOffset;
         const parsedOffset = rawOffset === undefined ? undefined : Number(rawOffset);
+        const rawTrigger = element.dataset.tooltipTrigger;
 
         //position
         const position =
@@ -317,11 +318,17 @@ export function createMediaTooltips() {
                 ? parsedOffset
                 : undefined;
 
+        const trigger =
+            rawTrigger === "hover" || rawTrigger === "click"
+                ? rawTrigger
+                : undefined;
+
         return tooltip(element, {
             media,
             position,
             width,
             offset,
+            trigger,
         });
     });
 

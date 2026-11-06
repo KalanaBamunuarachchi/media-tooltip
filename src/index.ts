@@ -158,17 +158,25 @@ export function tooltip(
     function show(): void {
         if (destroyed) return;
 
-        cancelHide();
+        clearTimeout(hideTimeout);
 
         container.style.display = "block";
         positionTooltip();
+
+        if (options.autoplay ?? true) {
+            if (video.ended) {
+                video.currentTime = 0;
+            }
+
+            video.play().catch(() => { });
+        }
     }
 
     function hide(): void {
-        if (destroyed) return;
+        clearTimeout(hideTimeout);
 
-        cancelHide();
         container.style.display = "none";
+        video.pause();
     }
 
     function destroy(): void {
@@ -293,6 +301,9 @@ export function createMediaTooltips() {
         const rawOffset = element.dataset.tooltipOffset;
         const parsedOffset = rawOffset === undefined ? undefined : Number(rawOffset);
         const rawTrigger = element.dataset.tooltipTrigger;
+        const autoplay = element.dataset.tooltipAutoplay;
+        const loop = element.dataset.tooltipLoop;
+        const muted = element.dataset.tooltipMuted;
 
         //position
         const position =
@@ -323,12 +334,24 @@ export function createMediaTooltips() {
                 ? rawTrigger
                 : undefined;
 
+        const parsedAutoplay =
+            autoplay === undefined ? undefined : autoplay === "true";
+
+        const parsedLoop =
+            loop === undefined ? undefined : loop === "true";
+
+        const parsedMuted =
+            muted === undefined ? undefined : muted === "true";
+
         return tooltip(element, {
             media,
             position,
             width,
             offset,
             trigger,
+            autoplay: parsedAutoplay,
+            loop: parsedLoop,
+            muted: parsedMuted,
         });
     });
 

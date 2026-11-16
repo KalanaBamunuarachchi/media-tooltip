@@ -1,5 +1,5 @@
 
-import type { TooltipInstance, TooltipOptions } from "./types";
+import type { TooltipInstance, TooltipOptions, MediaTooltipsOptions } from "./types";
 
 export function tooltip(
     target: string | HTMLElement,
@@ -18,6 +18,11 @@ export function tooltip(
 
     const container = document.createElement("div");
     const video = document.createElement("video");
+    if (options.className) {
+        container.classList.add(
+            ...options.className.split(/\s+/).filter(Boolean)
+        );
+    }
     let hideTimeout: ReturnType<typeof setTimeout> | undefined;
     let destroyed = false;
 
@@ -160,6 +165,8 @@ export function tooltip(
 
         clearTimeout(hideTimeout);
 
+        const wasHidden = container.style.display === "none";
+
         container.style.display = "block";
         positionTooltip();
 
@@ -170,13 +177,25 @@ export function tooltip(
 
             video.play().catch(() => { });
         }
+
+        if (wasHidden) {
+            options.onShow?.();
+        }
     }
 
     function hide(): void {
+        if (destroyed) return;
+
+        const wasVisible = container.style.display !== "none";
+
         clearTimeout(hideTimeout);
 
         container.style.display = "none";
         video.pause();
+
+        if (wasVisible) {
+            options.onHide?.();
+        }
     }
 
     function destroy(): void {
@@ -284,10 +303,10 @@ export function tooltip(
 }
 
 
-export function createMediaTooltips() {
-    const elements = document.querySelectorAll<HTMLElement>(
-        "[data-tooltip-media]"
-    );
+export function createMediaTooltips(options: MediaTooltipsOptions = {}) {
+    const selector = options.selector ?? "[data-tooltip-media]";
+
+    const elements = document.querySelectorAll<HTMLElement>(selector);
 
 
     const instances = Array.from(elements).map((element) => {
@@ -295,53 +314,88 @@ export function createMediaTooltips() {
 
         if (!media) return null;
 
+        // Position
         const rawPosition = element.dataset.tooltipPosition;
+        let position = options.defaults?.position;
+
+        if (
+            rawPosition === "top" ||
+            rawPosition === "bottom" ||
+            rawPosition === "left" ||
+            rawPosition === "right"
+        ) {
+            position = rawPosition;
+        }
+
+        // Width
         const rawWidth = element.dataset.tooltipWidth;
         const parsedWidth = rawWidth === undefined ? undefined : Number(rawWidth);
+
+        let width = options.defaults?.width;
+
+        if (
+            parsedWidth !== undefined &&
+            Number.isFinite(parsedWidth) &&
+            parsedWidth > 0
+        ) {
+            width = parsedWidth;
+        }
+
+        // Offset
         const rawOffset = element.dataset.tooltipOffset;
         const parsedOffset = rawOffset === undefined ? undefined : Number(rawOffset);
-        const rawTrigger = element.dataset.tooltipTrigger;
-        const autoplay = element.dataset.tooltipAutoplay;
-        const loop = element.dataset.tooltipLoop;
-        const muted = element.dataset.tooltipMuted;
 
-        //position
-        const position =
-            rawPosition === "top" ||
-                rawPosition === "bottom" ||
-                rawPosition === "left" ||
-                rawPosition === "right"
-                ? rawPosition
-                : undefined;
+        let offset = options.defaults?.offset;
 
-        //width
-        const width =
-            parsedWidth !== undefined &&
-                Number.isFinite(parsedWidth) &&
-                parsedWidth > 0
-                ? parsedWidth
-                : undefined;
-
-        const offset =
+        if (
             parsedOffset !== undefined &&
-                Number.isFinite(parsedOffset) &&
-                parsedOffset >= 0
-                ? parsedOffset
-                : undefined;
+            Number.isFinite(parsedOffset) &&
+            parsedOffset >= 0
+        ) {
+            offset = parsedOffset;
+        }
 
-        const trigger =
-            rawTrigger === "hover" || rawTrigger === "click"
-                ? rawTrigger
-                : undefined;
+        // Trigger
+        const rawTrigger = element.dataset.tooltipTrigger;
+        let trigger = options.defaults?.trigger;
 
-        const parsedAutoplay =
-            autoplay === undefined ? undefined : autoplay === "true";
+        if (rawTrigger === "hover" || rawTrigger === "click") {
+            trigger = rawTrigger;
+        }
 
-        const parsedLoop =
-            loop === undefined ? undefined : loop === "true";
+        // Autoplay
+        const rawAutoplay = element.dataset.tooltipAutoplay;
+        let autoplay = options.defaults?.autoplay;
 
-        const parsedMuted =
-            muted === undefined ? undefined : muted === "true";
+        if (rawAutoplay === "true") {
+            autoplay = true;
+        } else if (rawAutoplay === "false") {
+            autoplay = false;
+        }
+
+        // Loop
+        const rawLoop = element.dataset.tooltipLoop;
+        let loop = options.defaults?.loop;
+
+        if (rawLoop === "true") {
+            loop = true;
+        } else if (rawLoop === "false") {
+            loop = false;
+        }
+
+        // Muted
+        const rawMuted = element.dataset.tooltipMuted;
+        let muted = options.defaults?.muted;
+
+        if (rawMuted === "true") {
+            muted = true;
+        } else if (rawMuted === "false") {
+            muted = false;
+        }
+
+        // Custom CSS class
+        const rawClassName = element.dataset.tooltipClass;
+        const className = rawClassName || options.defaults?.className;
 
         return tooltip(element, {
             media,
@@ -349,11 +403,15 @@ export function createMediaTooltips() {
             width,
             offset,
             trigger,
-            autoplay: parsedAutoplay,
-            loop: parsedLoop,
-            muted: parsedMuted,
+            autoplay,
+            loop,
+            muted,
+            className,
+            onShow: options.defaults?.onShow,
+            onHide: options.defaults?.onHide,
         });
     });
+
 
     return {
         destroy() {

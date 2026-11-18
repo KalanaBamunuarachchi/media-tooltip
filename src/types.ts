@@ -3,8 +3,16 @@ export type TooltipPosition = "top" | "bottom" | "left" | "right";
 
 export type TooltipTrigger = "hover" | "click";
 
+export type TooltipError = {
+    type: "media" | "playback";
+    message: string;
+    code?: number;
+    cause?: unknown;
+};
+
 export type TooltipOptions = {
     media: string;
+    loadTimeout?: number;
     position?: TooltipPosition;
     trigger?: TooltipTrigger;
     width?: number;
@@ -15,6 +23,7 @@ export type TooltipOptions = {
     className?: string;
     onShow?: () => void;
     onHide?: () => void;
+    onError?: (error: TooltipError) => void;
 };
 
 export type TooltipInstance = {

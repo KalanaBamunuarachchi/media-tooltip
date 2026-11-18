@@ -1,7 +1,8 @@
 import type { TooltipInstance, TooltipOptions, MediaTooltipsOptions } from "./types";
-export type { TooltipPosition, TooltipTrigger, TooltipOptions, TooltipInstance, MediaTooltipsOptions } from "./types";
+export type { TooltipPosition, TooltipTrigger, TooltipError, TooltipOptions, TooltipInstance, MediaTooltipsOptions } from "./types";
 
 let tooltipIdCounter = 0;
+let activeTooltip: TooltipInstance | null = null;
 
 export function tooltip(
     target: string | HTMLElement,
@@ -13,10 +14,15 @@ export function tooltip(
             : target;
 
     if (!resolvedElement) {
-        throw new Error(`Tooltip target not found: ${target}`);
+        throw new Error(
+            typeof target === "string"
+                ? `Tooltip target not found: ${target}`
+                : "Tooltip target element is unavailable."
+        );
     }
 
     const element: HTMLElement = resolvedElement;
+    let instance!: TooltipInstance;
 
     const container = document.createElement("div");
     const video = document.createElement("video");
@@ -48,8 +54,11 @@ export function tooltip(
     let hideTimeout: ReturnType<typeof setTimeout> | undefined;
     let destroyed = false;
     let pointerStart: { x: number; y: number } | null = null;
+    let sourceLoaded = false;
+    let loadTimeoutId: ReturnType<typeof setTimeout> | undefined;
+    let loadTimedOut = false;
 
-    video.src = options.media;
+    video.preload = "none";
     video.autoplay = false;
     video.loop = options.loop ?? true;
     video.muted = options.muted ?? true;
@@ -159,12 +168,64 @@ export function tooltip(
         container.style.top =
             `${Math.min(maxTop, Math.max(margin, selected.top))}px`;
     };
+
+    function loadVideo(): void {
+        if (sourceLoaded || destroyed) return;
+
+        sourceLoaded = true;
+
+        const timeout = options.loadTimeout ?? 0;
+
+        if (Number.isFinite(timeout) && timeout > 0) {
+            loadTimeoutId = setTimeout(() => {
+                loadTimedOut = true;
+                loadTimeoutId = undefined;
+
+                video.pause();
+
+                options.onError?.({
+                    type: "media",
+                    message: "Video loading timed out.",
+                });
+            }, timeout);
+        }
+
+        video.preload = "auto";
+        video.src = options.media;
+        video.load();
+    }
+
+
     function handleVideoMetadata(): void {
         if (destroyed) return;
 
         if (container.style.display !== "none") {
             positionTooltip();
         }
+    }
+
+    function handleVideoCanPlay(): void {
+        if (loadTimeoutId !== undefined) {
+            clearTimeout(loadTimeoutId);
+            loadTimeoutId = undefined;
+        }
+    }
+
+    function handleVideoError(): void {
+        if (destroyed) return;
+
+        const error = video.error;
+
+        if (loadTimeoutId !== undefined) {
+            clearTimeout(loadTimeoutId);
+            loadTimeoutId = undefined;
+        }
+
+        options.onError?.({
+            type: "media",
+            message: error?.message || "Failed to load video.",
+            code: error?.code,
+        });
     }
 
     function handleViewportChange(): void {
@@ -177,21 +238,31 @@ export function tooltip(
 
 
     video.addEventListener("loadedmetadata", handleVideoMetadata);
-
+    video.addEventListener("error", handleVideoError);
     window.addEventListener("resize", handleViewportChange);
     window.addEventListener("scroll", handleViewportChange, true);
+    video.addEventListener("canplay", handleVideoCanPlay);
 
 
 
     function show(): void {
         if (destroyed) return;
 
-        clearTimeout(hideTimeout);
+        cancelHide();
+
+        if (activeTooltip && activeTooltip !== instance) {
+            activeTooltip.hide();
+        }
+
+        activeTooltip = instance;
 
         const wasHidden = container.style.display === "none";
 
         container.style.display = "block";
         container.setAttribute("aria-hidden", "false");
+
+        loadVideo();
+
         positionTooltip();
 
         const prefersReducedMotion =
@@ -200,9 +271,29 @@ export function tooltip(
         const shouldAutoplay =
             options.autoplay ?? !prefersReducedMotion;
 
-        if (shouldAutoplay) {
+        if (shouldAutoplay && !loadTimedOut) {
             if (video.ended) video.currentTime = 0;
-            video.play().catch(() => { });
+
+            video.play()
+                .then(() => {
+                    if (
+                        destroyed ||
+                        loadTimedOut ||
+                        container.style.display === "none"
+                    ) {
+                        video.pause();
+                    }
+                })
+                .catch((cause: unknown) => {
+                    if (destroyed || loadTimedOut) return;
+
+                    options.onError?.({
+                        type: "playback",
+                        message: "Failed to start video playback.",
+                        cause,
+                    });
+                });
+            
         }
 
         if (wasHidden) {
@@ -215,10 +306,15 @@ export function tooltip(
 
         const wasVisible = container.style.display !== "none";
 
-        clearTimeout(hideTimeout);
+        cancelHide();
 
         container.style.display = "none";
         container.setAttribute("aria-hidden", "true");
+
+        if (activeTooltip === instance) {
+            activeTooltip = null;
+        }
+
         video.pause();
 
         if (wasVisible) {
@@ -231,6 +327,16 @@ export function tooltip(
 
         destroyed = true;
         cancelHide();
+
+        if (activeTooltip === instance) {
+            activeTooltip = null;
+        }
+
+        //destroy cleanup
+        if (loadTimeoutId !== undefined) {
+            clearTimeout(loadTimeoutId);
+            loadTimeoutId = undefined;
+        }
 
         // Restore the trigger's original aria-describedby value.
         if (previousDescribedBy === null) {
@@ -270,9 +376,10 @@ export function tooltip(
 
         container.remove();
         video.removeEventListener("loadedmetadata", handleVideoMetadata);
-
+        video.removeEventListener("error", handleVideoError);
         window.removeEventListener("resize", handleViewportChange);
         window.removeEventListener("scroll", handleViewportChange, true);
+        video.removeEventListener("canplay", handleVideoCanPlay);
     }
     //timeout for tooltip
 
@@ -426,123 +533,113 @@ export function tooltip(
     document.addEventListener("keydown", handleDocumentKeyDown);
 
 
-    return {
+    instance = {
         show,
         hide,
         destroy
     };
+
+    return instance;
 
 
 
 
 }
 
+function getBooleanOption(
+    value: string | undefined,
+    defaultValue: boolean | undefined
+): boolean | undefined {
+    if (value === "true") return true;
+    if (value === "false") return false;
+
+    return defaultValue;
+}
 
 
 export function createMediaTooltips(options: MediaTooltipsOptions = {}) {
     const selector = options.selector ?? "[data-tooltip-media]";
     const instances = new Map<HTMLElement, TooltipInstance>();
 
-    function initializeElement(element: HTMLElement) {
-        // Prevent duplicate initialization.
+    //helper
+    function getPosition(element: HTMLElement): TooltipOptions["position"] {
+        const value = element.dataset.tooltipPosition;
+
+        if (
+            value === "top" ||
+            value === "bottom" ||
+            value === "left" ||
+            value === "right"
+        ) {
+            return value;
+        }
+
+        return options.defaults?.position;
+    }
+
+    function getWidth(element: HTMLElement): number | undefined {
+        const value = element.dataset.tooltipWidth;
+
+        if (value === undefined) return options.defaults?.width;
+
+        const parsed = Number(value);
+
+        return Number.isFinite(parsed) && parsed > 0
+            ? parsed
+            : options.defaults?.width;
+    }
+
+    function getOffset(element: HTMLElement): number | undefined {
+        const value = element.dataset.tooltipOffset;
+
+        if (value === undefined) return options.defaults?.offset;
+
+        const parsed = Number(value);
+
+        return Number.isFinite(parsed) && parsed >= 0
+            ? parsed
+            : options.defaults?.offset;
+    }
+
+    function getTrigger(element: HTMLElement): TooltipOptions["trigger"] {
+        const value = element.dataset.tooltipTrigger;
+
+        return value === "hover" || value === "click"
+            ? value
+            : options.defaults?.trigger;
+    }
+
+
+    function initializeElement(element: HTMLElement): void {
         if (instances.has(element)) return;
 
         const media = element.dataset.tooltipMedia;
         if (!media) return;
 
-        // Position
-        const rawPosition = element.dataset.tooltipPosition;
-        let position = options.defaults?.position;
-
-        if (
-            rawPosition === "top" ||
-            rawPosition === "bottom" ||
-            rawPosition === "left" ||
-            rawPosition === "right"
-        ) {
-            position = rawPosition;
-        }
-
-        // Width
-        const rawWidth = element.dataset.tooltipWidth;
-        const parsedWidth = rawWidth === undefined ? undefined : Number(rawWidth);
-        let width = options.defaults?.width;
-
-        if (
-            parsedWidth !== undefined &&
-            Number.isFinite(parsedWidth) &&
-            parsedWidth > 0
-        ) {
-            width = parsedWidth;
-        }
-
-        // Offset
-        const rawOffset = element.dataset.tooltipOffset;
-        const parsedOffset = rawOffset === undefined ? undefined : Number(rawOffset);
-        let offset = options.defaults?.offset;
-
-        if (
-            parsedOffset !== undefined &&
-            Number.isFinite(parsedOffset) &&
-            parsedOffset >= 0
-        ) {
-            offset = parsedOffset;
-        }
-
-        // Trigger
-        const rawTrigger = element.dataset.tooltipTrigger;
-        let trigger = options.defaults?.trigger;
-
-        if (rawTrigger === "hover" || rawTrigger === "click") {
-            trigger = rawTrigger;
-        }
-
-        // Autoplay
-        const rawAutoplay = element.dataset.tooltipAutoplay;
-        let autoplay = options.defaults?.autoplay;
-
-        if (rawAutoplay === "true") {
-            autoplay = true;
-        } else if (rawAutoplay === "false") {
-            autoplay = false;
-        }
-
-        // Loop
-        const rawLoop = element.dataset.tooltipLoop;
-        let loop = options.defaults?.loop;
-
-        if (rawLoop === "true") {
-            loop = true;
-        } else if (rawLoop === "false") {
-            loop = false;
-        }
-
-        // Muted
-        const rawMuted = element.dataset.tooltipMuted;
-        let muted = options.defaults?.muted;
-
-        if (rawMuted === "true") {
-            muted = true;
-        } else if (rawMuted === "false") {
-            muted = false;
-        }
-
-        // Custom CSS class
-        const rawClassName = element.dataset.tooltipClass;
-        const className = rawClassName || options.defaults?.className;
-
         const instance = tooltip(element, {
             media,
-            position,
-            width,
-            offset,
-            trigger,
-            autoplay,
-            loop,
-            muted,
-            className,
+            position: getPosition(element),
+            width: getWidth(element),
+            offset: getOffset(element),
+            trigger: getTrigger(element),
+            autoplay: getBooleanOption(
+                element.dataset.tooltipAutoplay,
+                options.defaults?.autoplay
+            ),
+            loop: getBooleanOption(
+                element.dataset.tooltipLoop,
+                options.defaults?.loop
+            ),
+            muted: getBooleanOption(
+                element.dataset.tooltipMuted,
+                options.defaults?.muted
+            ),
+            className:
+                element.dataset.tooltipClass || options.defaults?.className,
+            loadTimeout: options.defaults?.loadTimeout,
             onShow: options.defaults?.onShow,
             onHide: options.defaults?.onHide,
+            onError: options.defaults?.onError,
         });
 
         instances.set(element, instance);

@@ -1,0 +1,94 @@
+
+{
+  "version": 1.1,
+  "globalAttributes": [
+    {
+      "name": "data-tooltip-media",
+      "description": "Specifies the video source used by the media tooltip. Required for automatic initialization."
+    },
+    {
+      "name": "data-tooltip-position",
+      "description": "Sets the preferred position of the tooltip. Defaults to top.",
+      "valueSet": "tooltipPosition"
+    },
+    {
+      "name": "data-tooltip-width",
+      "description": "Sets the tooltip video width in pixels. Must be a positive number. Defaults to 300."
+    },
+    {
+      "name": "data-tooltip-offset",
+      "description": "Sets the distance between the trigger and tooltip in pixels. Must be a non-negative number. Defaults to 8."
+    },
+    {
+      "name": "data-tooltip-trigger",
+      "description": "Sets how the tooltip is activated. Defaults to hover.",
+      "valueSet": "tooltipTrigger"
+    },
+    {
+      "name": "data-tooltip-autoplay",
+      "description": "Controls automatic video playback. Defaults to true unless reduced motion is preferred.",
+      "valueSet": "booleanValue"
+    },
+    {
+      "name": "data-tooltip-loop",
+      "description": "Controls whether the video repeats. Defaults to true.",
+      "valueSet": "booleanValue"
+    },
+    {
+      "name": "data-tooltip-muted",
+      "description": "Controls whether the video is muted. Defaults to true.",
+      "valueSet": "booleanValue"
+    },
+    {
+      "name": "data-tooltip-class",
+      "description": "Adds one or more custom CSS classes to the tooltip container."
+    }
+  ],
+  "valueSets": [
+    {
+      "name": "tooltipPosition",
+      "values": [
+        {
+          "name": "top",
+          "description": "Position the tooltip above the trigger."
+        },
+        {
+          "name": "bottom",
+          "description": "Position the tooltip below the trigger."
+        },
+        {
+          "name": "left",
+          "description": "Position the tooltip to the left of the trigger."
+        },
+        {
+          "name": "right",
+          "description": "Position the tooltip to the right of the trigger."
+        }
+      ]
+    },
+    {
+      "name": "tooltipTrigger",
+      "values": [
+        {
+          "name": "hover",
+          "description": "Activate the tooltip on hover. Touch and pen interactions are also supported."
+        },
+        {
+          "name": "click",
+          "description": "Activate the tooltip on click."
+        }
+      ]
+    },
+    {
+      "name": "booleanValue",
+      "values": [
+        {
+          "name": "true"
+        },
+        {
+          "name": "false"
+        }
+      ]
+    }
+  ]
+}

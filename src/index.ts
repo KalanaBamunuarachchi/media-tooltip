@@ -26,6 +26,11 @@ export function tooltip(
 
     const container = document.createElement("div");
     const video = document.createElement("video");
+    const fallback = document.createElement("div");
+
+    fallback.textContent = "Preview unavailable";
+    fallback.setAttribute("role", "status");
+    fallback.setAttribute("aria-live", "polite");
 
     const tooltipId = `media-tooltip-${++tooltipIdCounter}`;
 
@@ -64,18 +69,44 @@ export function tooltip(
     video.muted = options.muted ?? true;
 
     container.appendChild(video);
+    container.appendChild(fallback);
 
     container.style.position = "fixed";
     container.style.zIndex = "9999";
     container.style.display = "none";
     container.style.overflow = "hidden";
+    container.style.boxSizing = "border-box";
 
+    // Tooltip syles
+    container.style.padding = "8px";
+    container.style.backgroundColor = "#ffffff";
+    container.style.border = "1px solid #e5e7eb";
+    container.style.borderRadius = "12px";
+    container.style.boxShadow = "0 8px 24px rgba(0, 0, 0, 0.16)";
+
+    // Video styles
     video.style.display = "block";
     video.style.width = `${options.width ?? 300}px`;
     video.style.height = "auto";
-    video.style.maxWidth = "calc(100vw - 16px)";
-    video.style.maxHeight = "calc(100vh - 16px)";
+    video.style.maxWidth = "calc(100vw - 34px)";
+    video.style.maxHeight = "calc(100vh - 34px)";
+    video.style.borderRadius = "6px";
     video.style.objectFit = "contain";
+
+    // Error fallback styles
+    fallback.style.display = "none";
+    fallback.style.width = `${options.width ?? 300}px`;
+    fallback.style.maxWidth = "calc(100vw - 34px)";
+    fallback.style.minHeight = "100px";
+    fallback.style.boxSizing = "border-box";
+    fallback.style.padding = "16px";
+    fallback.style.alignItems = "center";
+    fallback.style.justifyContent = "center";
+    fallback.style.textAlign = "center";
+    fallback.style.fontFamily = "system-ui, sans-serif";
+    fallback.style.fontSize = "14px";
+    fallback.style.fontWeight = "500";
+    fallback.style.color = "#4b5563";
 
     document.body.appendChild(container);
 
@@ -169,6 +200,21 @@ export function tooltip(
             `${Math.min(maxTop, Math.max(margin, selected.top))}px`;
     };
 
+    let fallbackShown = false;
+
+    function showFallback(): void {
+        if (destroyed || fallbackShown) return;
+
+        fallbackShown = true;
+
+        video.pause();
+        video.style.display = "none";
+
+        fallback.style.display = "flex";
+
+        positionTooltip();
+    }
+
     function loadVideo(): void {
         if (sourceLoaded || destroyed) return;
 
@@ -181,7 +227,7 @@ export function tooltip(
                 loadTimedOut = true;
                 loadTimeoutId = undefined;
 
-                video.pause();
+                showFallback();
 
                 options.onError?.({
                     type: "media",
@@ -212,7 +258,7 @@ export function tooltip(
     }
 
     function handleVideoError(): void {
-        if (destroyed) return;
+        if (destroyed || fallbackShown || loadTimedOut) return;
 
         const error = video.error;
 
@@ -220,6 +266,8 @@ export function tooltip(
             clearTimeout(loadTimeoutId);
             loadTimeoutId = undefined;
         }
+
+        showFallback();
 
         options.onError?.({
             type: "media",
@@ -293,7 +341,7 @@ export function tooltip(
                         cause,
                     });
                 });
-            
+
         }
 
         if (wasHidden) {
@@ -653,7 +701,7 @@ export function createMediaTooltips(options: MediaTooltipsOptions = {}) {
         root.querySelectorAll<HTMLElement>(selector).forEach(initializeElement);
     }
 
-    // Initialize elements already present in the document.
+    
     initializeMatchingElements(document);
 
     // Observe future DOM changes.

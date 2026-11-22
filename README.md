@@ -8,10 +8,10 @@ Lightweight video tooltips for the web.
 
 ## Demo
 
+## Demo
+
 <div align="center">
-  <video src="./assets/demo/sample.mp4" width="100%" controls>
-    Your browser does not support the video tag.
-  </video>
+  <img src="./assets/demo/sample.gif" width="100%" alt="media-tooltip demo" />
 </div>
 
 

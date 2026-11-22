@@ -8,8 +8,6 @@ Lightweight video tooltips for the web.
 
 ## Demo
 
-## Demo
-
 <div align="center">
   <img src="./assets/demo/sample.gif" width="100%" alt="media-tooltip demo" />
 </div>
